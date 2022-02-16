@@ -17,18 +17,18 @@ function fetchReposMetadataJson(host, path) {
   return new Promise((resolve, reject) => {
     const callback = function (response) {
       if (!response) {
-        reject('Error: "response" is undefined!');
+        reject('Error: response is undefined!');
         return;
       }
 
       if (response.statusCode !== 200) {
         let errStr = '';
 
-        response.on("data", function (chunk) {
+        response.on('data', function (chunk) {
           errStr += chunk;
         });
 
-        response.on("end", function () {
+        response.on('end', function () {
           reject(`Got unexpected status code: '${response ? response.statusCode : undefined}'! Details:\n${errStr}`);
         });
 
@@ -55,7 +55,7 @@ function fetchReposMetadataJson(host, path) {
       });
     };
 
-    https.get(url, options, callback).on("error", reject);
+    https.get(url, options, callback).on('error', reject);
   });
 }
 
