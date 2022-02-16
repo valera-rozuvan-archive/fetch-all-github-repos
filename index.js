@@ -1,59 +1,90 @@
-const fs = require('fs');
-const path = require('path');
-const execSync = require('child_process').execSync;
-const request = require('request');
+const https = require('https');
 
-const GITHUB_USER = '';
-const GITHUB_API_KEY = '';
-const BASE_FS_PATH = '';
+const GITHUB_USER = process.env.GITHUB_USER ? process.env.GITHUB_USER : '';
+const GITHUB_API_KEY = process.env.GITHUB_API_KEY ? process.env.GITHUB_API_KEY : '';
 
-function fetchReposMetadataJson(url) {
-  const promise = new Promise((resolve, reject) => {
-    request.get({
-        url,
-        json: true,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0',
-          'Authorization': `token ${GITHUB_API_KEY}`
+function fetchReposMetadataJson(host, path) {
+  const url = `https://${host}/${path}`;
+
+  const options = {
+    headers: {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0',
+      'Authorization': `token ${GITHUB_API_KEY}`,
+    },
+  };
+
+  return new Promise((resolve, reject) => {
+    const callback = function (response) {
+      if (!response) {
+        reject('Error: "response" is undefined!');
+        return;
+      }
+
+      if (response.statusCode !== 200) {
+        let errStr = '';
+
+        response.on("data", function (chunk) {
+          errStr += chunk;
+        });
+
+        response.on("end", function () {
+          reject(`Got unexpected status code: '${response ? response.statusCode : undefined}'! Details:\n${errStr}`);
+        });
+
+        return;
+      }
+
+      let dataStr = '';
+
+      response.on('data', function (chunk) {
+        dataStr += chunk;
+      });
+
+      response.on('end', function () {
+        let dataObj;
+
+        try {
+          dataObj = JSON.parse(dataStr);
+        } catch (err) {
+          reject(err);
+          return;
         }
-      }, (err, res, data) => {
-        if (err) {
-          reject({ res: null, err });
-        } else if (res.statusCode !== 200) {
-          reject({ res, err: null });
-        } else {
-          resolve(data);
-        }
-    });
+
+        resolve(dataObj);
+      });
+    };
+
+    https.get(url, options, callback).on("error", reject);
   });
-
-  return promise;
 }
 
-function fetchAllRepos(startPage) {
+function fetchAllRepos(repoType) {
   const repos = [];
 
-  const promise = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     function fetchReposByPage(page) {
-      console.log(`page ${page}`);
-
-      fetchReposMetadataJson(`https://api.github.com/users/${GITHUB_USER}/repos?page=${page}&per_page=30`).then((data) => {
+      fetchReposMetadataJson('api.github.com', `${repoType}/${GITHUB_USER}/repos?page=${page}&per_page=30`).then((data) => {
         if (data.length === 0) {
           resolve(repos);
         } else {
-          // Here `data` is already parsed as JSON. Append to `repos` array.
-          repos.push.apply(repos, data);
+          console.log(`[page ${page}]`);
+          console.log(`--------------`);
 
+          // Here `data` is already parsed as JSON. Append to `repos` array.
+          repos.push.apply(repos, data.map((repo) => repo.name));
           setTimeout(() => {
             fetchReposByPage(page + 1);
-          }, 1500 + Math.floor(Math.random() * 1500));
+          }, 800 + Math.floor(Math.random() * 400));
         }
-      }).catch((data) => {
-        if (data.res) {
-          console.log('Status: ', data.res.statusCode);
-          console.log('Body: ', data.res.body);
-        } else if (data.err) {
-          console.log('Error: ', data.err);
+      }).catch((error) => {
+        if (error.res) {
+          console.log('Status: ', error.res.statusCode);
+          console.log('Body: ', error.res.body);
+        } else if (error.err) {
+          console.log('Error: ', error.err);
+        } else if (error) {
+          console.log(error);
         } else {
           console.log('Unknown error!');
         }
@@ -64,38 +95,14 @@ function fetchAllRepos(startPage) {
 
     fetchReposByPage(1);
   });
-
-  return promise;
 }
 
-function pullOrCloneRepos(repos) {
-  repos.forEach((repo, idx) => {
-    if (fs.existsSync(path.join(BASE_FS_PATH, repo.name))) {
-      console.log(`\n[${idx + 1}/${repos.length}] pull ${repo.name} ...`);
-      const errCode = execSync(
-        'git pull origin master',
-        {
-          cwd: path.join(BASE_FS_PATH, repo.name),
-          stdio: 'inherit'
-        }
-      );
-    } else {
-      console.log(`\n[${idx + 1}/${repos.length}] clone ${repo.name} ...`);
-      const errCode = execSync(
-        `git clone ${repo.clone_url}`,
-        {
-          cwd: BASE_FS_PATH,
-          stdio: 'inherit'
-        }
-      );
-    }
-  });
-}
-
-fetchAllRepos().then((repos) => {
+fetchAllRepos('users').then((repos) => {
   console.log('\n-----');
-  console.log(`Total repos to process: ${repos.length}`);
-  console.log('-----');
+  console.log(`Total repos: ${repos.length}`);
+  console.log('-----\n');
 
-  pullOrCloneRepos(repos);
+  repos.forEach((repo) => {
+    console.log(`"${repo}"`);
+  });
 });
