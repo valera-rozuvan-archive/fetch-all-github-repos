@@ -1,5 +1,11 @@
 # fetch-all-github-repos
 
+## wip has moved
+
+Future work on this repository has moved to the monorepo [valera-rozuvan/howtos](https://github.com/valera-rozuvan/howtos). This repo is archived for historic purposes (to preserve commit history). Navigate over to [howtos/fetch-all-github-repos](https://github.com/valera-rozuvan/howtos/tree/main/fetch-all-github-repos) to see updates (if any).
+
+## introduction
+
 Fetch all GitHub repos.
 
 ## Howto
